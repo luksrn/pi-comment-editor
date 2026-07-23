@@ -1,0 +1,51 @@
+{
+  "name": "@ramtinj95/pi-comment-editor",
+  "version": "0.1.0",
+  "description": "Compose comments on Pi assistant responses in your external editor",
+  "type": "module",
+  "license": "MIT",
+  "author": "Ramtin Javanmardi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ramtinJ95/pi-comment-editor.git"
+  },
+  "homepage": "https://github.com/ramtinJ95/pi-comment-editor#readme",
+  "bugs": {
+    "url": "https://github.com/ramtinJ95/pi-comment-editor/issues"
+  },
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "comment",
+    "editor",
+    "reply"
+  ],
+  "files": [
+    "extensions/comment-editor/index.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "pi": {
+    "extensions": [
+      "./extensions/comment-editor/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.81.1",
+    "@types/bun": "^1.3.14",
+    "@types/node": "^24.0.0",
+    "typescript": "^7.0.2"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc",
+    "test:package": "npm pack --dry-run",
+    "check": "npm run typecheck && npm test && npm run test:package"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
