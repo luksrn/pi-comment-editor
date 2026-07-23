@@ -3,7 +3,7 @@ import path from "node:path";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import {
 	editWithExternalEditor,
-	formatQuotedEditorText,
+	formatCommentEditorText,
 	getLastAssistantText,
 	parseEditorCommand,
 } from "../extensions/comment-editor/index.ts";
@@ -50,8 +50,10 @@ describe("getLastAssistantText", () => {
 	});
 });
 
-test("formats every response line as a Markdown quote", () => {
-	expect(formatQuotedEditorText("one\n\ntwo")).toBe("> one\n> \n> two");
+test("starts with a comment area followed by the quoted assistant response", () => {
+	expect(formatCommentEditorText("one\n\ntwo")).toBe(
+		"\n\n## Previous assistant response\n\n> one\n> \n> two",
+	);
 });
 
 describe("parseEditorCommand", () => {

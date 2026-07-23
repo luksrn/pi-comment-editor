@@ -26,11 +26,13 @@ export function getLastAssistantText(branch: readonly SessionEntry[]): string | 
 	return undefined;
 }
 
-export function formatQuotedEditorText(text: string): string {
-	return text
+export function formatCommentEditorText(text: string): string {
+	const quotedResponse = text
 		.split(/\r?\n/)
 		.map((line) => `> ${line}`)
 		.join("\n");
+
+	return `\n\n## Previous assistant response\n\n${quotedResponse}`;
 }
 
 export function parseEditorCommand(command: string): string[] {
@@ -149,7 +151,7 @@ export default function commentEditorExtension(pi: ExtensionAPI) {
 			}
 
 			try {
-				const editedText = editWithExternalEditor(formatQuotedEditorText(lastAssistantText));
+				const editedText = editWithExternalEditor(formatCommentEditorText(lastAssistantText));
 				ctx.ui.setEditorText(editedText);
 				ctx.ui.notify("Comment loaded into the editor", "info");
 			} catch (error) {

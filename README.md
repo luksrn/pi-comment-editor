@@ -29,9 +29,21 @@ After Pi produces a response, run:
 The command:
 
 1. Takes the latest completed assistant response on the current session branch.
-2. Formats every line as a Markdown quote.
+2. Opens with an empty comment area followed by the assistant response under a clear Markdown heading.
 3. Opens the quoted response in `$VISUAL`, falling back to `$EDITOR`.
 4. Replaces Pi's prompt editor contents with the saved text.
+
+The editor buffer starts in this form, with the cursor in the empty comment area:
+
+```markdown
+
+
+## Previous assistant response
+
+> The assistant response appears here.
+```
+
+Write your response above the heading, or add unquoted inline comments between quoted sections.
 
 The command does not submit the comment. Review or continue editing it in Pi, then send it normally.
 
