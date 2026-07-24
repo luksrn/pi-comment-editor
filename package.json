@@ -1,6 +1,6 @@
 {
   "name": "@ramtinj95/pi-comment-editor",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "Compose comments on Pi assistant responses in your external editor",
   "type": "module",
   "license": "MIT",
