@@ -31,7 +31,8 @@ The command:
 1. Takes the latest completed assistant response on the current session branch.
 2. Opens with an empty comment area followed by the assistant response under a clear Markdown heading.
 3. Opens the quoted response in `$VISUAL`, falling back to `$EDITOR`.
-4. Replaces Pi's prompt editor contents with the saved text.
+4. Loads only your comment when the quoted response is unchanged.
+5. Loads the complete saved text when you add inline comments or otherwise change the reference section.
 
 The editor buffer starts in this form, with the cursor in the empty comment area:
 
@@ -43,7 +44,9 @@ The editor buffer starts in this form, with the cursor in the empty comment area
 > The assistant response appears here.
 ```
 
-Write your response above the heading, or add unquoted inline comments between quoted sections.
+Write your response above the heading to avoid repeating the unchanged assistant response in the next prompt. You can instead add unquoted inline comments between quoted sections; Pi will retain the complete annotated response so those comments keep their context.
+
+If you save without entering a comment, Pi's prompt editor remains empty.
 
 The command does not submit the comment. Review or continue editing it in Pi, then send it normally.
 
