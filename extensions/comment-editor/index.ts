@@ -35,6 +35,51 @@ export function formatCommentEditorText(text: string): string {
 	return `\n\n## Previous assistant response\n\n${quotedResponse}`;
 }
 
+export type CommentEditorResult =
+	| { kind: "empty"; text: "" }
+	| { kind: "comment"; text: string }
+	| { kind: "annotated"; text: string };
+
+function normalizeLineEndings(text: string): string {
+	return text.replace(/\r\n?/g, "\n");
+}
+
+function trimBlankBoundaryLines(text: string): string {
+	const lines = text.split("\n");
+	let start = 0;
+	let end = lines.length;
+
+	while (start < end && /^[ \t]*$/.test(lines[start])) {
+		start++;
+	}
+	while (end > start && /^[ \t]*$/.test(lines[end - 1])) {
+		end--;
+	}
+
+	return lines.slice(start, end).join("\n");
+}
+
+export function prepareCommentEditorResult(
+	savedText: string,
+	initialText: string,
+): CommentEditorResult {
+	const normalizedSavedText = normalizeLineEndings(savedText);
+	const normalizedInitialText = normalizeLineEndings(initialText);
+
+	if (!normalizedInitialText || !normalizedSavedText.endsWith(normalizedInitialText)) {
+		return { kind: "annotated", text: savedText };
+	}
+
+	const commentText = trimBlankBoundaryLines(
+		normalizedSavedText.slice(0, -normalizedInitialText.length),
+	);
+	if (!commentText) {
+		return { kind: "empty", text: "" };
+	}
+
+	return { kind: "comment", text: commentText };
+}
+
 export function parseEditorCommand(command: string): string[] {
 	const args: string[] = [];
 	let current = "";
@@ -151,9 +196,21 @@ export default function commentEditorExtension(pi: ExtensionAPI) {
 			}
 
 			try {
-				const editedText = editWithExternalEditor(formatCommentEditorText(lastAssistantText));
-				ctx.ui.setEditorText(editedText);
-				ctx.ui.notify("Comment loaded into the editor", "info");
+				const initialText = formatCommentEditorText(lastAssistantText);
+				const savedText = editWithExternalEditor(initialText);
+				const result = prepareCommentEditorResult(savedText, initialText);
+				ctx.ui.setEditorText(result.text);
+
+				if (result.kind === "empty") {
+					ctx.ui.notify("No comment entered", "info");
+				} else if (result.kind === "annotated") {
+					ctx.ui.notify(
+						"Reference section changed; loaded the complete text into the editor",
+						"info",
+					);
+				} else {
+					ctx.ui.notify("Comment loaded into the editor", "info");
+				}
 			} catch (error) {
 				ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
 			}
