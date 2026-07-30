@@ -86,4 +86,19 @@ describe("formatReviewMessage", () => {
 	test("returns an empty message for no annotations", () => {
 		expect(formatReviewMessage(createResponseDocument("one"), [])).toBe("");
 	});
+
+	test("aligns continuation content with multi-digit list markers", () => {
+		const document = createResponseDocument("quoted");
+		const annotations: ResponseAnnotation[] = Array.from({ length: 10 }, (_, index) => ({
+			id: `annotation-${index + 1}`,
+			ordinal: index + 1,
+			target: { kind: "lines", startLine: 0, endLine: 0 },
+			kind: "comment",
+			body: `Body ${index + 1}`,
+		}));
+
+		const output = formatReviewMessage(document, annotations);
+		expect(output).toContain("9. **[COMMENT]** Response line 1\n\n   > quoted\n\n   Body 9");
+		expect(output).toContain("10. **[COMMENT]** Response line 1\n\n    > quoted\n\n    Body 10");
+	});
 });

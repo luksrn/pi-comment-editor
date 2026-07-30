@@ -458,6 +458,8 @@ export function formatReviewMessage(
 
 	for (let index = 0; index < ordered.length; index++) {
 		const annotation = ordered[index];
+		const marker = `${index + 1}. `;
+		const continuationIndent = " ".repeat(marker.length);
 		let location = "Overall response";
 		if (annotation.target.kind === "lines") {
 			const start = annotation.target.startLine + 1;
@@ -465,7 +467,7 @@ export function formatReviewMessage(
 			location = start === end ? `Response line ${start}` : `Response lines ${start}-${end}`;
 		}
 
-		output.push(`${index + 1}. **[${annotation.kind.toUpperCase()}]** ${location}`, "");
+		output.push(`${marker}**[${annotation.kind.toUpperCase()}]** ${location}`, "");
 
 		if (annotation.target.kind === "lines") {
 			for (
@@ -473,13 +475,13 @@ export function formatReviewMessage(
 				line <= annotation.target.endLine;
 				line++
 			) {
-				output.push(`   > ${document.lines[line] ?? ""}`);
+				output.push(`${continuationIndent}> ${document.lines[line] ?? ""}`);
 			}
 			output.push("");
 		}
 
 		for (const bodyLine of annotation.body.split(/\r\n|\r|\n/)) {
-			output.push(`   ${bodyLine}`);
+			output.push(`${continuationIndent}${bodyLine}`);
 		}
 		if (index < ordered.length - 1) output.push("");
 	}
