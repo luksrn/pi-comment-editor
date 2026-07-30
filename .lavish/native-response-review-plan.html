@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en" data-theme="catppuccin-mocha">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Native response review — implementation plan</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+  <style>
+    :root, [data-theme="catppuccin-mocha"] {
+      color-scheme: dark;
+      --color-base-100: #1e1e2e;
+      --color-base-200: #181825;
+      --color-base-300: #11111b;
+      --color-base-content: #cdd6f4;
+      --color-primary: #cba6f7;
+      --color-primary-content: #11111b;
+      --color-secondary: #89b4fa;
+      --color-secondary-content: #11111b;
+      --color-accent: #94e2d5;
+      --color-accent-content: #11111b;
+      --color-neutral: #313244;
+      --color-neutral-content: #cdd6f4;
+      --color-info: #89dceb;
+      --color-info-content: #11111b;
+      --color-success: #a6e3a1;
+      --color-success-content: #11111b;
+      --color-warning: #f9e2af;
+      --color-warning-content: #11111b;
+      --color-error: #f38ba8;
+      --color-error-content: #11111b;
+      --radius-selector: 0.5rem;
+      --radius-field: 0.5rem;
+      --radius-box: 0.75rem;
+      --border: 1px;
+      --depth: 1;
+      --noise: 0;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    :where(.grid, .flex) > * { min-width: 0; }
+    :where(p, h1, h2, h3, li, td, th, code, .badge, .label) { overflow-wrap: anywhere; }
+    body { min-height: 100vh; }
+    .plan-shell { width: min(1180px, calc(100% - 2rem)); margin: 0 auto; }
+    .plan-kicker { letter-spacing: .16em; text-transform: uppercase; }
+    .terminal-line { display: grid; grid-template-columns: 3rem 1fr; gap: .75rem; }
+    .terminal-line .ln { text-align: right; opacity: .42; user-select: none; }
+    .terminal-line.active { background: color-mix(in oklab, var(--color-primary) 17%, transparent); }
+    .terminal-line.selected { border-left: 3px solid var(--color-warning); padding-left: .5rem; }
+    .decision-option:has(input:checked) { border-color: var(--color-primary); background: color-mix(in oklab, var(--color-primary) 10%, transparent); }
+    .mermaid { overflow-x: auto; }
+    pre, code { white-space: pre-wrap; }
+  </style>
+</head>
+<body class="bg-base-200 text-base-content">
+  <header class="border-b border-base-content/10 bg-base-100">
+    <div class="plan-shell py-10 md:py-14">
+      <div class="flex flex-wrap items-center gap-3">
+        <span class="badge badge-success badge-outline">Aligned</span>
+        <span class="badge badge-ghost">Design phase</span>
+        <span class="badge badge-ghost">No implementation started</span>
+      </div>
+      <p class="plan-kicker mt-6 text-xs text-primary">pi-comment-editor · V2</p>
+      <h1 class="mt-2 max-w-4xl text-4xl font-bold leading-tight md:text-6xl">Review an assistant response like a code diff—without pretending it is one.</h1>
+      <p class="mt-6 max-w-3xl text-lg text-base-content/70">Build a native Pi line-range annotation UI. Borrow the interaction model from <code>tuicr</code>, but keep response review independent from VCS, persistence, and an external binary.</p>
+      <div class="mt-8 alert alert-success alert-soft max-w-4xl">
+        <span><strong>Product review complete:</strong> native-only line-range review, raw source lines, exact quoted context, and no tuicr embedding were approved.</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="plan-shell space-y-14 py-12 md:py-16">
+    <section>
+      <div class="mb-6 flex items-end justify-between gap-4">
+        <div>
+          <p class="plan-kicker text-xs text-primary">Recommendation</p>
+          <h2 class="mt-2 text-3xl font-bold">Native core, one interaction model</h2>
+        </div>
+        <span class="badge badge-success badge-soft">4 explorer passes agreed</span>
+      </div>
+      <div class="grid gap-5 lg:grid-cols-3">
+        <article class="card card-border bg-base-100 lg:col-span-2">
+          <div class="card-body">
+            <h3 class="card-title">The way forward</h3>
+            <ul class="list-disc space-y-3 pl-5 text-base-content/75">
+              <li><code>/comment</code> opens a normal <code>ctx.ui.custom()</code> component.</li>
+              <li>A pure reducer owns source lines, selection, annotations, cancellation, layout mappings, and export.</li>
+              <li>A thin component owns raw keys, theme, terminal dimensions, rendering, and Pi's multiline <code>Editor</code>.</li>
+              <li>The existing external-editor workflow is removed rather than retained as a parallel mode.</li>
+              <li>Finishing only calls <code>ctx.ui.setEditorText()</code>; it never sends a user message automatically.</li>
+            </ul>
+          </div>
+        </article>
+        <article class="card card-border bg-base-100">
+          <div class="card-body">
+            <h3 class="card-title">Why not embed tuicr?</h3>
+            <p class="text-sm text-base-content/70">Its useful ideas are portable; its implementation is not. The app is coupled to file paths, old/new sides, VCS diffs, persisted sessions, Ratatui, and forge review lifecycle.</p>
+            <div class="mt-3 badge badge-error badge-soft">Wrong abstraction boundary</div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <p class="plan-kicker text-xs text-primary">Target experience</p>
+      <h2 class="mt-2 text-3xl font-bold">A source-stable review surface</h2>
+      <p class="mt-3 max-w-3xl text-base-content/65">Logical response lines are the annotation identity. Wrapping only affects presentation, so resizing cannot move feedback to a different passage.</p>
+      <div class="mockup-window mt-7 border border-base-content/15 bg-base-300">
+        <div class="bg-neutral px-5 py-5 font-mono text-sm text-neutral-content">
+          <div class="mb-4 flex flex-wrap justify-between gap-2 text-neutral-content/60">
+            <span>Review previous assistant response</span>
+            <span>2 annotations · VISUAL 8–11</span>
+          </div>
+          <div class="terminal-line"><span class="ln">7</span><span>The implementation reads the latest response.</span></div>
+          <div class="terminal-line selected active"><span class="ln">8</span><span>We should add another fallback layer here because...</span></div>
+          <div class="terminal-line selected"><span class="ln">9</span><span>the original operation might return an uncertain result.</span></div>
+          <div class="terminal-line selected"><span class="ln">10</span><span></span></div>
+          <div class="terminal-line selected"><span class="ln">11</span><span>This makes the failure quieter for callers.</span></div>
+          <div class="terminal-line"><span class="ln">12</span><span>Then continue with the normal flow.</span></div>
+          <div class="mt-5 rounded border border-warning/50 bg-warning/10 p-3 text-warning">
+            <div class="mb-1 font-bold">ISSUE · lines 8–11</div>
+            <div>Do not hide this failure. Make the invalid state explicit.</div>
+          </div>
+          <div class="mt-5 text-neutral-content/55">j/k move · v select · c comment · s suggestion · i issue · y finish · Esc cancel</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <p class="plan-kicker text-xs text-primary">Architecture</p>
+      <h2 class="mt-2 text-3xl font-bold">Effects stay at the edges</h2>
+      <div class="mt-7 card card-border bg-base-100">
+        <div class="card-body">
+          <div class="mermaid">
+flowchart TD
+  A["/comment command"] --> B["Current branch + latest completed response"]
+  B --> D["Pi response-review component"]
+  D --> F["Pure review state + source/display mapping"]
+  F --> D
+  D --> G{"Result"}
+  G -->|"cancel / empty"| H["No prompt mutation"]
+  G -->|"annotations"| I["Deterministic formatter"]
+  I --> J["ctx.ui.setEditorText"]
+          </div>
+          <div class="mt-5 grid gap-4 md:grid-cols-3">
+            <div class="rounded-box bg-base-200 p-4"><div class="font-bold">index.ts</div><p class="mt-1 text-sm text-base-content/65">Branch lookup, mode dispatch, notifications, prompt mutation.</p></div>
+            <div class="rounded-box bg-base-200 p-4"><div class="font-bold">response-review.ts</div><p class="mt-1 text-sm text-base-content/65">Pure model, reducer, coordinate mapping, sanitization inputs, formatter.</p></div>
+            <div class="rounded-box bg-base-200 p-4"><div class="font-bold">response-review-component.ts</div><p class="mt-1 text-sm text-base-content/65">Keys, focus, Pi Editor, rendering, dimensions, done callback.</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <p class="plan-kicker text-xs text-primary">Delivery</p>
+      <h2 class="mt-2 text-3xl font-bold">Four slices, each independently testable</h2>
+      <ul class="steps steps-vertical mt-8 w-full lg:steps-horizontal">
+        <li class="step step-primary"><span class="max-w-48"><strong>1. Pure contracts</strong><br><small>Reducer, ranges, annotations, output goldens</small></span></li>
+        <li class="step"><span class="max-w-48"><strong>2. Vertical path</strong><br><small>Browse, select, draft one annotation, finish</small></span></li>
+        <li class="step"><span class="max-w-48"><strong>3. Full lifecycle</strong><br><small>Multiple, overall, edit/delete, discard, hardening</small></span></li>
+        <li class="step"><span class="max-w-48"><strong>4. Migration</strong><br><small>Remove external path, docs, packed install</small></span></li>
+      </ul>
+      <div class="mt-8 alert alert-info alert-soft"><span>Every slice runs <code>npm run check</code>. The default command does not switch until the single-annotation path has passed a manual Pi TUI check.</span></div>
+    </section>
+
+    <section>
+      <p class="plan-kicker text-xs text-primary">Risk register</p>
+      <h2 class="mt-2 text-3xl font-bold">What is actually difficult</h2>
+      <div class="mt-7 overflow-x-auto rounded-box border border-base-content/10 bg-base-100">
+        <table class="table table-zebra">
+          <thead><tr><th>Risk</th><th>Severity</th><th>Design response</th></tr></thead>
+          <tbody>
+            <tr><td>Wrapped rows become annotation identity</td><td><span class="badge badge-error badge-soft">Highest</span></td><td>Separate source, display, and screen coordinates; pure mapping tests.</td></tr>
+            <tr><td>Cancel clears the user's Pi draft</td><td><span class="badge badge-error badge-soft">High</span></td><td>Only call <code>setEditorText</code> after successful nonempty completion.</td></tr>
+            <tr><td>Unicode or ANSI breaks terminal layout</td><td><span class="badge badge-warning badge-soft">High</span></td><td>Pi width utilities, built-in Editor, display sanitization, adversarial fixtures.</td></tr>
+            <tr><td>IME focus is misplaced</td><td><span class="badge badge-warning badge-soft">Medium</span></td><td>Implement Focusable and propagate focus to the embedded Editor.</td></tr>
+            <tr><td>Works in repo, fails from npm package</td><td><span class="badge badge-warning badge-soft">Medium</span></td><td>Declare pi-tui peer, ship runtime directory, install packed tarball in smoke test.</td></tr>
+            <tr><td>Removing the current workflow surprises users</td><td><span class="badge badge-ghost">Product</span></td><td>Release as V2 and document the breaking native replacement prominently.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="alignment" class="card card-border bg-base-100">
+      <div class="card-body gap-7">
+        <div>
+          <p class="plan-kicker text-xs text-primary">Alignment record</p>
+          <h2 class="mt-2 text-3xl font-bold">Approved load-bearing decisions</h2>
+          <p class="mt-3 text-base-content/65">The selected options record the completed product review. The canonical Markdown plan carries the implementation contract.</p>
+        </div>
+        <form id="alignment-form" data-lavish-question="native-response-review-alignment" class="space-y-8">
+          <fieldset>
+            <legend class="text-lg font-bold">1. Migration path</legend>
+            <div class="mt-3 grid gap-3 md:grid-cols-3">
+              <label class="decision-option cursor-pointer rounded-box border border-base-content/15 p-4"><input class="radio radio-primary mr-2" type="radio" name="migration" value="Native /comment plus explicit /comment external compatibility path"><strong>Native + compatibility</strong><p class="mt-2 text-sm text-base-content/60">Changes the default but preserves the old capability explicitly.</p></label>
+              <label class="decision-option cursor-pointer rounded-box border border-base-content/15 p-4"><input class="radio radio-primary mr-2" type="radio" name="migration" value="Native /comment only; remove external editor" checked><strong>Native only</strong><p class="mt-2 text-sm text-base-content/60">Approved. One focused interaction model for V2.</p></label>
+              <label class="decision-option cursor-pointer rounded-box border border-base-content/15 p-4"><input class="radio radio-primary mr-2" type="radio" name="migration" value="Keep external /comment default and add native under another command"><strong>External remains default</strong><p class="mt-2 text-sm text-base-content/60">Least disruptive, but makes the requested experience secondary.</p></label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend class="text-lg font-bold">2. Selection scope</legend>
+            <div class="mt-3 grid gap-3 md:grid-cols-3">
+              <label class="decision-option cursor-pointer rounded-box border border-base-content/15 p-4"><input class="radio radio-primary mr-2" type="radio" name="selection" value="Logical line ranges only in V2" checked><strong>Line ranges</strong><p class="mt-2 text-sm text-base-content/60">Recommended. Matches tuicr's useful model and survives wrapping/resizing.</p></label>
+              <label class="decision-option cursor-pointer rounded-box border border-base-content/15 p-4"><input class="radio radio-primary mr-2" type="radio" name="selection" value="Character-level ranges required in V2"><strong>Character ranges</strong><p class="mt-2 text-sm text-base-content/60">More precise, but substantially increases Unicode and coordinate complexity.</p></label>
+              <label class="decision-option cursor-pointer rounded-box border border-base-content/15 p-4"><input class="radio radio-primary mr-2" type="radio" name="selection" value="Overall comments only for first vertical slice"><strong>Overall first</strong><p class="mt-2 text-sm text-base-content/60">Smaller first slice, but does not yet deliver the core selected-passage workflow.</p></label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend class="text-lg font-bold">3. Source presentation</legend>
+            <div class="mt-3 grid gap-3 md:grid-cols-2">
+              <label class="decision-option cursor-pointer rounded-box border border-base-content/15 p-4"><input class="radio radio-primary mr-2" type="radio" name="display" value="Raw Markdown source with stable line numbers" checked><strong>Raw source</strong><p class="mt-2 text-sm text-base-content/60">Recommended. Exact, selectable, and stable across terminal sizes.</p></label>
+              <label class="decision-option cursor-pointer rounded-box border border-base-content/15 p-4"><input class="radio radio-primary mr-2" type="radio" name="display" value="Rendered Markdown despite source/display mapping cost"><strong>Rendered Markdown</strong><p class="mt-2 text-sm text-base-content/60">More polished, but visual blocks no longer correspond directly to response lines.</p></label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend class="text-lg font-bold">4. Output context</legend>
+            <div class="mt-3 grid gap-3 md:grid-cols-2">
+              <label class="decision-option cursor-pointer rounded-box border border-base-content/15 p-4"><input class="radio radio-primary mr-2" type="radio" name="output" value="Include exact selected quotes with every line-range annotation" checked><strong>Exact selected quotes</strong><p class="mt-2 text-sm text-base-content/60">Recommended. Gives the agent compact, explicit anchors without repeating the full response.</p></label>
+              <label class="decision-option cursor-pointer rounded-box border border-base-content/15 p-4"><input class="radio radio-primary mr-2" type="radio" name="output" value="Use response line numbers without copied quotes"><strong>Line references only</strong><p class="mt-2 text-sm text-base-content/60">Smaller prompts, but less robust when context is compacted or repeated.</p></label>
+            </div>
+          </fieldset>
+
+          <label class="fieldset">
+            <span class="fieldset-legend text-lg font-bold">Additional constraints or changes</span>
+            <textarea class="textarea textarea-bordered min-h-28 w-full" name="notes" placeholder="Anything the plan should change before implementation..."></textarea>
+          </label>
+
+          <div class="flex flex-wrap items-center gap-4">
+            <button type="submit" class="btn btn-primary">Queue alignment response</button>
+            <span id="queue-status" class="text-sm text-base-content/60">Nothing queued yet.</span>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section class="grid gap-5 md:grid-cols-2">
+      <article class="card card-border bg-base-100"><div class="card-body"><h2 class="card-title">Canonical plan</h2><p class="text-base-content/65"><code>docs/v2-native-response-review-plan.md</code> contains the complete product contract, architecture, tests, slices, and failure matrix.</p></div></article>
+      <article class="card card-border bg-base-100"><div class="card-body"><h2 class="card-title">Repository state</h2><p class="text-base-content/65">Only planning artifacts were added. Runtime source, package metadata, and tests have not been changed.</p></div></article>
+    </section>
+  </main>
+
+  <footer class="border-t border-base-content/10 bg-base-100 py-8">
+    <div class="plan-shell text-sm text-base-content/55">Design source: DaisyUI/Tailwind fallback, because this terminal-extension repository has no browser design system to mirror.</div>
+  </footer>
+
+  <script>
+    document.getElementById("alignment-form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const data = new FormData(form);
+      const decisions = [
+        `Migration: ${data.get("migration")}`,
+        `Selection: ${data.get("selection")}`,
+        `Display: ${data.get("display")}`,
+        `Output: ${data.get("output")}`,
+      ];
+      const notes = String(data.get("notes") || "").trim();
+      const prompt = [
+        "Use this alignment feedback to revise or approve docs/v2-native-response-review-plan.md before implementation:",
+        ...decisions.map((item) => `- ${item}`),
+        notes ? `- Additional constraints: ${notes}` : "- Additional constraints: none",
+      ].join("\n");
+      if (window.lavish?.queuePrompt) {
+        window.lavish.queuePrompt(prompt, {
+          tag: "plan-alignment",
+          text: "Native response review alignment",
+          queueKey: "native-response-review-alignment",
+          element: form,
+          data: Object.fromEntries(data.entries()),
+        });
+        document.getElementById("queue-status").textContent = "Alignment response queued. Use Send to Agent when ready.";
+      } else {
+        document.getElementById("queue-status").textContent = "Lavish controls are unavailable in this standalone view.";
+      }
+    });
+  </script>
+
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.15.0/dist/mermaid.esm.min.mjs";
+    const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const paint = document.createElement("canvas").getContext("2d");
+    function toRgba(color) {
+      paint.clearRect(0, 0, 1, 1);
+      paint.fillStyle = "#000";
+      paint.fillStyle = color;
+      paint.fillRect(0, 0, 1, 1);
+      return paint.getImageData(0, 0, 1, 1).data;
+    }
+    function compositeRgba(foreground, background) {
+      const fa = foreground[3] / 255;
+      const ba = background[3] / 255;
+      const a = fa + ba * (1 - fa);
+      if (a === 0) return [0, 0, 0, 0];
+      return [
+        (foreground[0] * fa + background[0] * ba * (1 - fa)) / a,
+        (foreground[1] * fa + background[1] * ba * (1 - fa)) / a,
+        (foreground[2] * fa + background[2] * ba * (1 - fa)) / a,
+        a * 255,
+      ];
+    }
+    function pageIsDark() {
+      const root = document.documentElement;
+      const rootBg = toRgba(getComputedStyle(root).backgroundColor);
+      const bodyBg = toRgba(getComputedStyle(document.body).backgroundColor);
+      const [r, g, b, a] = compositeRgba(bodyBg, rootBg);
+      if (a > 0) return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
+      return darkQuery.matches;
+    }
+    const diagrams = [...document.querySelectorAll(".mermaid")].map((el) => ({ el, src: el.textContent }));
+    let applied;
+    let rendering = false;
+    let queued = false;
+    function queueRender() { queued = true; if (!rendering) void render(); }
+    async function render() {
+      rendering = true;
+      try {
+        while (queued) {
+          queued = false;
+          const theme = pageIsDark() ? "dark" : "default";
+          if (theme === applied) continue;
+          mermaid.initialize({ startOnLoad: false, theme, securityLevel: "strict" });
+          for (const { el, src } of diagrams) { el.removeAttribute("data-processed"); el.textContent = src; }
+          await mermaid.run({ nodes: diagrams.map((d) => d.el) });
+          applied = theme;
+        }
+      } finally {
+        rendering = false;
+        if (queued) queueRender();
+      }
+    }
+    if (document.readyState === "complete") queueRender();
+    else window.addEventListener("load", queueRender, { once: true });
+    new MutationObserver(queueRender).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "class", "style"] });
+    darkQuery.addEventListener("change", queueRender);
+  </script>
+</body>
+</html>
