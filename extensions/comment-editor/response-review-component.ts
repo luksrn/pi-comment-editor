@@ -115,7 +115,8 @@ export class ResponseReviewComponent implements Component, Focusable {
 	}
 
 	private refresh(): void {
-		this.invalidate();
+		this.lastLayout = undefined;
+		this.editor.invalidate();
 		this.tui.requestRender();
 	}
 

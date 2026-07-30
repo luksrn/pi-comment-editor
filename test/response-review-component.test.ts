@@ -45,6 +45,27 @@ describe("ResponseReviewComponent", () => {
 		}
 	});
 
+	test("preserves syntax highlighting across state-only refreshes", () => {
+		const { component } = harness("```ts\nconst value = 1;\n```\nafter");
+		component.render(60);
+		const internals = component as unknown as {
+			highlightedDisplayLines?: readonly string[];
+		};
+		const highlighted = internals.highlightedDisplayLines;
+
+		component.handleInput("j");
+		component.render(60);
+		expect(internals.highlightedDisplayLines).toBe(highlighted);
+
+		component.handleInput("c");
+		component.handleInput("x");
+		component.render(60);
+		expect(internals.highlightedDisplayLines).toBe(highlighted);
+
+		component.invalidate();
+		expect(internals.highlightedDisplayLines).toBeUndefined();
+	});
+
 	test("creates a typed backward range annotation and completes once", () => {
 		const { component, results } = harness();
 		component.render(60);
