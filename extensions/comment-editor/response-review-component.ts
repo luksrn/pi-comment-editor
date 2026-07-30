@@ -313,11 +313,19 @@ export class ResponseReviewComponent implements Component, Focusable {
 			this.state.mode.kind === "draft" && this.state.mode.draft.error ? 1 : 0;
 		const minimumHeight = this.state.mode.kind === "draft" ? 10 + draftErrorRows : 7;
 		if (renderWidth < 18 || terminalHeight < minimumHeight) {
-			return [
-				fitLine(this.theme.fg("accent", "Response review"), renderWidth),
-				fitLine(this.theme.fg("warning", "Terminal too small"), renderWidth),
-				fitLine(this.theme.fg("dim", "Resize or Esc to cancel"), renderWidth),
-			];
+			const fallbackLines =
+				this.state.mode.kind === "confirmDiscard"
+					? [
+							fitLine(this.theme.fg("accent", "Response review"), renderWidth),
+							fitLine(this.theme.fg("warning", "Discard saved annotations?"), renderWidth),
+							fitLine(this.theme.fg("dim", "y/Enter discard · n/Esc keep"), renderWidth),
+						]
+					: [
+							fitLine(this.theme.fg("accent", "Response review"), renderWidth),
+							fitLine(this.theme.fg("warning", "Terminal too small"), renderWidth),
+							fitLine(this.theme.fg("dim", "Resize or Esc to cancel"), renderWidth),
+						];
+			return fallbackLines.slice(0, terminalHeight);
 		}
 
 		const lines: string[] = [];

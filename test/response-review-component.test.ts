@@ -179,6 +179,21 @@ describe("ResponseReviewComponent", () => {
 		expect(saved.results).toEqual([{ kind: "cancelled" }]);
 	});
 
+	test("shows actionable discard confirmation in the small-terminal fallback", () => {
+		const { component, results } = harness("zero\none", 6);
+		component.handleInput("c");
+		enterText(component, "saved note");
+		component.handleInput("\x13");
+		component.handleInput("\x1b");
+
+		const output = component.render(60).join("\n");
+		expect(output).toContain("Discard saved annotations?");
+		expect(output).toContain("y/Enter discard · n/Esc keep");
+
+		component.handleInput("y");
+		expect(results).toEqual([{ kind: "cancelled" }]);
+	});
+
 	test("finishing without annotations returns an explicit empty result", () => {
 		const { component, results } = harness();
 		component.handleInput("y");
