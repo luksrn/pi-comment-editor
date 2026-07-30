@@ -20,7 +20,7 @@ import {
 	getActiveAnnotation,
 	getCurrentTarget,
 	highlightFencedCodeLines,
-	pageTargetLine,
+	pageTarget,
 	reduceReviewState,
 	type AnnotationKind,
 	type ResponseAnnotation,
@@ -183,15 +183,15 @@ export class ResponseReviewComponent implements Component, Focusable {
 			this.dispatch({ type: "move", delta: Math.sign(delta) * 10 });
 			return;
 		}
-		this.dispatch({
-			type: "moveTo",
-			line: pageTargetLine(
-				this.lastLayout.rows,
-				this.state.cursorLine,
-				delta,
-				this.lastLayout.bodyHeight,
-			),
-		});
+		const target = pageTarget(
+			this.lastLayout.rows,
+			this.state.cursorLine,
+			this.viewportOffset,
+			delta,
+			this.lastLayout.bodyHeight,
+		);
+		this.viewportOffset = target.viewportOffset;
+		this.dispatch({ type: "moveTo", line: target.line });
 	}
 
 	handleInput(data: string): void {

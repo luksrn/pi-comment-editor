@@ -66,6 +66,11 @@ export interface WrappedSourceRow {
 	continuation: boolean;
 }
 
+export interface PageTarget {
+	line: number;
+	viewportOffset: number;
+}
+
 export type CodeHighlighter = (code: string, language?: string) => string[];
 
 const TAB_WIDTH = 4;
@@ -403,25 +408,40 @@ export function ensureCursorVisible(
 	while (cursorEnd + 1 < rows.length && rows[cursorEnd + 1].sourceLine === cursorLine) cursorEnd++;
 	const maxOffset = Math.max(0, rows.length - height);
 	let offset = Math.max(0, Math.min(Math.trunc(viewportOffset), maxOffset));
-	if (cursorStart < offset) offset = cursorStart;
-	else if (cursorEnd >= offset + height) offset = Math.min(cursorStart, maxOffset);
+	if (cursorEnd < offset || cursorStart >= offset + height) {
+		offset = Math.min(cursorStart, maxOffset);
+	}
 	return offset;
 }
 
-export function pageTargetLine(
+export function pageTarget(
 	rows: readonly WrappedSourceRow[],
 	cursorLine: number,
+	viewportOffset: number,
 	delta: number,
 	viewportHeight: number,
-): number {
-	if (rows.length === 0) return 0;
-	const currentRow = Math.max(
+): PageTarget {
+	if (rows.length === 0) return { line: 0, viewportOffset: 0 };
+	const height = Math.max(1, Math.trunc(viewportHeight));
+	const distance = Math.max(1, height - 1);
+	const direction = Math.sign(delta);
+	const maxOffset = Math.max(0, rows.length - height);
+	const offset = Math.max(0, Math.min(Math.trunc(viewportOffset), maxOffset));
+	const cursorStart = Math.max(
 		0,
 		rows.findIndex((row) => row.sourceLine === cursorLine),
 	);
-	const distance = Math.max(1, Math.trunc(viewportHeight) - 1);
-	const targetRow = Math.max(0, Math.min(rows.length - 1, currentRow + Math.sign(delta) * distance));
-	return rows[targetRow].sourceLine;
+	let cursorEnd = cursorStart;
+	while (cursorEnd + 1 < rows.length && rows[cursorEnd + 1].sourceLine === cursorLine) cursorEnd++;
+	const currentRow =
+		direction < 0
+			? Math.min(cursorEnd, offset + height - 1)
+			: Math.max(cursorStart, offset);
+	const targetRow = Math.max(0, Math.min(rows.length - 1, currentRow + direction * distance));
+	return {
+		line: rows[targetRow].sourceLine,
+		viewportOffset: Math.max(0, Math.min(maxOffset, offset + direction * distance)),
+	};
 }
 
 export function formatReviewMessage(

@@ -5,7 +5,7 @@ import {
 	createResponseDocument,
 	ensureCursorVisible,
 	highlightFencedCodeLines,
-	pageTargetLine,
+	pageTarget,
 	sanitizeDisplayText,
 } from "../extensions/comment-editor/response-review.ts";
 
@@ -69,9 +69,19 @@ describe("response review layout", () => {
 		expect(ensureCursorVisible(rows, 0, 4, 3)).toBe(0);
 	});
 
-	test("moves pages by display rows and returns a logical line", () => {
+	test("moves pages by display rows and returns a logical line and viewport", () => {
 		const rows = buildWrappedSourceRows(createResponseDocument("aaaaaa\nb\nc\nd"), 2);
-		expect(pageTargetLine(rows, 0, 1, 4)).toBe(1);
-		expect(pageTargetLine(rows, 3, -1, 4)).toBe(0);
+		expect(pageTarget(rows, 0, 0, 1, 4)).toEqual({ line: 1, viewportOffset: 2 });
+		expect(pageTarget(rows, 3, 2, -1, 4)).toEqual({ line: 0, viewportOffset: 0 });
+	});
+
+	test("pages through a logical line taller than the viewport", () => {
+		const rows = buildWrappedSourceRows(createResponseDocument(`${"a".repeat(20)}\nnext`), 2);
+		const firstPage = pageTarget(rows, 0, 0, 1, 4);
+		const secondPage = pageTarget(rows, firstPage.line, firstPage.viewportOffset, 1, 4);
+
+		expect(firstPage).toEqual({ line: 0, viewportOffset: 3 });
+		expect(secondPage).toEqual({ line: 0, viewportOffset: 6 });
+		expect(ensureCursorVisible(rows, 0, secondPage.viewportOffset, 4)).toBe(6);
 	});
 });
