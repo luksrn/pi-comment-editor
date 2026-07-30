@@ -45,6 +45,21 @@ describe("ResponseReviewComponent", () => {
 		}
 	});
 
+	test("keeps draft layouts within the terminal height budget", () => {
+		for (const rows of [7, 8, 9, 10, 11]) {
+			const { component } = harness("zero\none\ntwo", rows);
+			component.handleInput("c");
+			const draftOutput = component.render(60);
+			expect(draftOutput.length).toBeLessThanOrEqual(rows);
+			expect(draftOutput.join("\n").includes("Terminal too small")).toBe(rows < 10);
+
+			component.handleInput("\x13");
+			const errorOutput = component.render(60);
+			expect(errorOutput.length).toBeLessThanOrEqual(rows);
+			expect(errorOutput.join("\n").includes("Terminal too small")).toBe(rows < 11);
+		}
+	});
+
 	test("preserves syntax highlighting across state-only refreshes", () => {
 		const { component } = harness("```ts\nconst value = 1;\n```\nafter");
 		component.render(60);

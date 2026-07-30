@@ -309,7 +309,10 @@ export class ResponseReviewComponent implements Component, Focusable {
 	render(width: number): string[] {
 		const renderWidth = Math.max(1, Math.trunc(width));
 		const terminalHeight = Math.max(1, this.tui.terminal.rows);
-		if (renderWidth < 18 || terminalHeight < 7) {
+		const draftErrorRows =
+			this.state.mode.kind === "draft" && this.state.mode.draft.error ? 1 : 0;
+		const minimumHeight = this.state.mode.kind === "draft" ? 10 + draftErrorRows : 7;
+		if (renderWidth < 18 || terminalHeight < minimumHeight) {
 			return [
 				fitLine(this.theme.fg("accent", "Response review"), renderWidth),
 				fitLine(this.theme.fg("warning", "Terminal too small"), renderWidth),
@@ -360,10 +363,10 @@ export class ResponseReviewComponent implements Component, Focusable {
 		const digits = String(this.state.document.lines.length).length;
 		const gutterWidth = digits + 6;
 		const bodyWidth = Math.max(1, renderWidth - gutterWidth);
-		const fixedRows = 6;
+		const fixedRows = 5 + draftErrorRows;
 		const draftRows = this.state.mode.kind === "draft" ? Math.min(6, Math.max(3, Math.floor(terminalHeight / 3))) : 0;
 		const previewRows = this.state.mode.kind === "browse" ? Math.min(4, Math.max(0, terminalHeight - 10)) : 0;
-		const bodyHeight = Math.max(2, terminalHeight - fixedRows - draftRows - previewRows);
+		const bodyHeight = terminalHeight - fixedRows - draftRows - previewRows;
 		const rows = buildWrappedSourceRows(
 			this.state.document,
 			bodyWidth,
