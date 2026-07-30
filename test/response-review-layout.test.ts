@@ -41,6 +41,16 @@ describe("response review layout", () => {
 		expect(sanitizeDisplayText("\u0085")).toBe("\\u{85}");
 	});
 
+	test("makes bidirectional format controls visible without changing source", () => {
+		const source = "left\u202Eoverride\u202C \u2066isolate\u2069 right";
+		const document = createResponseDocument(source);
+
+		expect(document.lines[0]).toBe(source);
+		expect(document.displayLines[0]).toBe(
+			"left\\u{202E}override\\u{202C} \\u{2066}isolate\\u{2069} right",
+		);
+	});
+
 	test("syntax-highlights fenced code without changing source-line identity", () => {
 		const document = createResponseDocument(
 			"Before\n```typescript\nconst value = 1;\nconsole.log(value);\n```\nAfter",

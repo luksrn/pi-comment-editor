@@ -75,6 +75,16 @@ export type CodeHighlighter = (code: string, language?: string) => string[];
 
 const TAB_WIDTH = 4;
 
+function isBidirectionalFormatControl(codePoint: number): boolean {
+	return (
+		codePoint === 0x061c ||
+		codePoint === 0x200e ||
+		codePoint === 0x200f ||
+		(codePoint >= 0x202a && codePoint <= 0x202e) ||
+		(codePoint >= 0x2066 && codePoint <= 0x2069)
+	);
+}
+
 export function sanitizeDisplayText(text: string): string {
 	let result = "";
 	for (const character of text) {
@@ -86,6 +96,8 @@ export function sanitizeDisplayText(text: string): string {
 		} else if (codePoint < 0x20) {
 			result += String.fromCodePoint(0x2400 + codePoint);
 		} else if (codePoint >= 0x80 && codePoint <= 0x9f) {
+			result += `\\u{${codePoint.toString(16).toUpperCase()}}`;
+		} else if (isBidirectionalFormatControl(codePoint)) {
 			result += `\\u{${codePoint.toString(16).toUpperCase()}}`;
 		} else {
 			result += character;
