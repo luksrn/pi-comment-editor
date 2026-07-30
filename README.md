@@ -1,6 +1,6 @@
 # pi-comment-editor
 
-A [Pi](https://github.com/earendil-works/pi-mono) extension for composing comments on assistant responses in your external editor.
+A [Pi](https://github.com/earendil-works/pi-mono) extension for reviewing the latest assistant response, attaching typed annotations to logical line ranges, and preparing the result as an editable user message.
 
 ## Install
 
@@ -12,45 +12,58 @@ Then run `/reload` or restart Pi. Pi packages execute with full system access; r
 
 ## Usage
 
-Configure an editor that waits until you close the file:
-
-```bash
-export VISUAL="code --wait"
-# or
-export EDITOR="nvim"
-```
-
 After Pi produces a response, run:
 
 ```text
 /comment
 ```
 
-The command:
+The native reviewer shows the latest completed assistant response on the current session branch as raw Markdown source with stable line numbers. Select logical lines, add comments, suggestions, or issues, and finish the review to load a structured message into Pi's prompt editor.
 
-1. Takes the latest completed assistant response on the current session branch.
-2. Opens with an empty comment area followed by the assistant response under a clear Markdown heading.
-3. Opens the quoted response in `$VISUAL`, falling back to `$EDITOR`.
-4. Loads only your comment when the quoted response is unchanged.
-5. Loads the complete saved text when you add inline comments or otherwise change the reference section.
+The command never submits the message. Review or continue editing it in Pi, then send it normally.
 
-The editor buffer starts in this form, with the cursor in the empty comment area:
+### Browse controls
+
+| Key | Action |
+| --- | --- |
+| `j` / `k`, arrows | Move by logical response line |
+| `Ctrl-d` / `Ctrl-u`, PageDown/PageUp | Move by a viewport page |
+| `g` / `G` | First / last line |
+| `v` | Start or cancel a line-range selection |
+| `c` | Comment on the current line or selection |
+| `s` | Suggestion on the current line or selection |
+| `i` | Issue on the current line or selection |
+| `C` | Comment on the overall response |
+| `[` / `]` | Previous / next saved annotation |
+| `e` | Edit the focused annotation |
+| `d` | Delete the focused annotation |
+| `y` | Finish and prepare the Pi prompt |
+| `Esc` | Cancel selection or leave the reviewer |
+
+In an annotation draft, use Pi's multiline editor. `Ctrl-s` saves and `Esc` cancels the draft. Leaving a review with saved annotations requires discard confirmation.
+
+### Prepared message
+
+The generated prompt contains exact quotes from the selected response lines rather than repeating the complete response:
 
 ```markdown
+I reviewed your previous response. Please address these annotations.
 
+1. **[ISSUE]** Response lines 8-11
 
-## Previous assistant response
+   > Exact selected response text
+   > continues here.
 
-> The assistant response appears here.
+   This conclusion does not follow from the evidence above.
 ```
 
-Write your response above the heading to avoid repeating the unchanged assistant response in the next prompt. You can instead add unquoted inline comments between quoted sections; Pi will retain the complete annotated response so those comments keep their context.
+`/comment` is available only in Pi's interactive TUI and accepts no arguments. Cancelling, finishing without annotations, or encountering an error leaves the existing Pi prompt unchanged.
 
-If you save without entering a comment, Pi's prompt editor remains empty.
+## Version 2 breaking change
 
-The command does not submit the comment. Review or continue editing it in Pi, then send it normally.
+Version 2 replaces the external `$VISUAL` / `$EDITOR` workflow with the native response reviewer. External-editor configuration and free-form edits to a quoted copy of the full response are no longer supported.
 
-`/comment` is available only in Pi's interactive TUI. The editor command may contain arguments and quoted paths, but shell operators and expansions are not evaluated.
+The current release was developed and validated against Pi `0.81.1`.
 
 ## Development
 
