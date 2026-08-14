@@ -74,6 +74,27 @@ export function expandHome(value: string, home: string = homedir()): string {
 }
 
 /**
+ * Reject content that is clearly not UTF-8 text: any NUL byte, or more than
+ * one control character / undecodable sequence in the first 8000 bytes
+ * (mirroring Git's buffer_is_binary). So .zip, images, and other binary
+ * files fail closed while any text file (.md, .json, ...) passes regardless
+ * of its extension.
+ */
+export function looksBinary(data: Uint8Array): boolean {
+	const sample = data.subarray(0, 8000);
+	if (sample.length === 0) return false;
+	for (const byte of sample) {
+		if (byte === 0) return true;
+	}
+	let nonPrintable = 0;
+	for (const char of new TextDecoder("utf-8", { fatal: false }).decode(sample)) {
+		const code = char.codePointAt(0)!;
+		if (code === 0xfffd || (code < 0x20 && !"\t\n\r\f\b".includes(char))) nonPrintable++;
+	}
+	return nonPrintable > 1;
+}
+
+/**
  * Suggest file paths for `/comment <path>`, mirroring pi's own file
  * completion: relative to the process working directory, `~` expanded, with
  * directories marked by a trailing slash. No shell is involved.
@@ -142,7 +163,12 @@ export async function handleCommentCommand(
 	let document: ResponseDocument;
 	if (filePath !== undefined) {
 		try {
-			const text = await readFile(resolve(ctx.cwd, expandHome(filePath)), "utf8");
+			const data = await readFile(resolve(ctx.cwd, expandHome(filePath)));
+			if (looksBinary(data)) {
+				ctx.ui.notify(`Cannot review ${filePath}: not a text file`, "error");
+				return;
+			}
+			const text = data.toString("utf8");
 			document = createResponseDocument(text, filePath);
 		} catch (error) {
 			ctx.ui.notify(`Cannot read ${filePath}: ${errorText(error)}`, "error");

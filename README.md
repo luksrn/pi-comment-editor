@@ -159,7 +159,7 @@ The extension calls Pi's editor-loading API only. It never invokes message submi
 - It runs only in Pi's interactive TUI.
 - The latest assistant response must be completed successfully; it will not skip an aborted response and review an older one.
 - Non-text assistant content is ignored.
-- Unreadable file paths report an error without opening the reviewer.
+- Unreadable or non-text file paths (e.g. `.zip`, images) report an error without opening the reviewer.
 - Cancelling, finishing without annotations, or encountering an error leaves the existing Pi input unchanged.
 - Leaving with saved annotations requires explicit discard confirmation.
 - The reviewer never runs an external editor or evaluates shell configuration.

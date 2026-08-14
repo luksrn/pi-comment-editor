@@ -11,6 +11,7 @@ import commentEditorExtension, {
 	completeFilePath,
 	expandHome,
 	handleCommentCommand,
+	looksBinary,
 } from "../extensions/comment-editor/index.ts";
 import type { ResponseReviewResult } from "../extensions/comment-editor/response-review-component.ts";
 
@@ -297,6 +298,45 @@ describe("/comment command", () => {
 		expect(fake.branchReads.count).toBe(0);
 		expect(fake.customCalls.count).toBe(1);
 		expect(fake.notifications.at(-1)).toEqual(["Review loaded into the editor", "info"]);
+	});
+
+	test("rejects binary file arguments without opening the reviewer", async () => {
+		const directory = temporaryDirectory();
+		const zip = Buffer.concat([
+			Buffer.from("PK\x03\x04"),
+			Buffer.from([0x14, 0x00, 0x00, 0x00, 0x00, 0x00]),
+			Buffer.from("compressed-data\x00\x01\x02\x03"),
+		]);
+		writeFileSync(path.join(directory, "archive.zip"), zip);
+		const fake = fakeContext({ cwd: directory });
+
+		await handleCommentCommand("archive.zip", fake.ctx);
+
+		expect(fake.notifications).toEqual([[`Cannot review archive.zip: not a text file`, "error"]]);
+		expect(fake.branchReads.count).toBe(0);
+		expect(fake.customCalls.count).toBe(0);
+		expect(fake.editorValues).toEqual([]);
+	});
+
+	describe("looksBinary", () => {
+		test("accepts plain text and empty files", () => {
+			expect(looksBinary(Buffer.from(""))).toBe(false);
+			expect(looksBinary(Buffer.from("plain text\nwith tabs\tand newlines\n"))).toBe(false);
+			expect(looksBinary(Buffer.from("{\"json\": \"value\"}\n"))).toBe(false);
+			expect(looksBinary(Buffer.from("Markdown with émoji 🎉 and accents\n"))).toBe(false);
+		});
+
+		test("rejects NUL bytes and control-character-heavy content", () => {
+			expect(looksBinary(Buffer.from([0x61, 0x00, 0x62]))).toBe(true);
+			const controls = Buffer.from(Array.from({ length: 100 }, () => 0x01));
+			expect(looksBinary(controls)).toBe(true);
+		});
+
+		test("rejects binary signatures and undecodable UTF-8", () => {
+			expect(looksBinary(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))).toBe(true);
+			const jpegish = Buffer.from(Array.from({ length: 64 }, (_, i) => 0xc0 + (i % 8)));
+			expect(looksBinary(jpegish)).toBe(true);
+		});
 	});
 
 	describe("completeFilePath", () => {
