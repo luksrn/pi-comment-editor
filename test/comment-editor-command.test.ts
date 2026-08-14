@@ -9,6 +9,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import commentEditorExtension, {
 	completeFilePath,
+	expandHome,
 	handleCommentCommand,
 } from "../extensions/comment-editor/index.ts";
 import type { ResponseReviewResult } from "../extensions/comment-editor/response-review-component.ts";
@@ -260,6 +261,42 @@ describe("/comment command", () => {
 
 		expect(fake.editorValues).toEqual([]);
 		expect(fake.notifications).toEqual([["reviewer failed", "error"]]);
+	});
+
+	test("expands a leading tilde to the home directory", () => {
+		expect(expandHome("~")).toBe(os.homedir());
+		expect(expandHome("~/docs/notes.md")).toBe(path.join(os.homedir(), "docs/notes.md"));
+		expect(expandHome("plain.md")).toBe("plain.md");
+		expect(expandHome("/abs/file.md")).toBe("/abs/file.md");
+		expect(expandHome("~", "/fake/home")).toBe("/fake/home");
+		expect(expandHome("~/x", "/fake/home")).toBe("/fake/home/x");
+	});
+
+	test("reviews a file argument with a tilde against the home directory", async () => {
+		const home = mkdtempSync(path.join(os.homedir(), ".pi-comment-editor-tilde-"));
+		temporaryDirectories.push(home);
+		writeFileSync(path.join(home, "notes.md"), "alpha\nbeta\n");
+		const fake = fakeContext({
+			cwd: temporaryDirectory(),
+			result: {
+				kind: "completed",
+				annotations: [
+					{
+						id: "annotation-1",
+						ordinal: 1,
+						target: { kind: "lines", startLine: 1, endLine: 1 },
+						kind: "comment",
+						body: "Nice.",
+					},
+				],
+			},
+		});
+
+		await handleCommentCommand(`~/${path.basename(home)}/notes.md`, fake.ctx);
+
+		expect(fake.branchReads.count).toBe(0);
+		expect(fake.customCalls.count).toBe(1);
+		expect(fake.notifications.at(-1)).toEqual(["Review loaded into the editor", "info"]);
 	});
 
 	describe("completeFilePath", () => {

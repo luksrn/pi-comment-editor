@@ -64,6 +64,16 @@ function stripQuotes(value: string): string {
 }
 
 /**
+ * Expand a leading `~` to the user's home directory. Other values are returned
+ * untouched so they resolve relative to the session working directory.
+ */
+export function expandHome(value: string, home: string = homedir()): string {
+	if (value === "~") return home;
+	if (value.startsWith("~/")) return join(home, value.slice(2));
+	return value;
+}
+
+/**
  * Suggest file paths for `/comment <path>`, mirroring pi's own file
  * completion: relative to the process working directory, `~` expanded, with
  * directories marked by a trailing slash. No shell is involved.
@@ -74,8 +84,6 @@ export function completeFilePath(
 ): AutocompleteItem[] | null {
 	const path = stripQuotes(prefix.trim());
 
-	const expandHome = (value: string): string =>
-		value === "~" ? homedir() : value.startsWith("~/") ? join(homedir(), value.slice(2)) : value;
 	const expanded = expandHome(path);
 
 	let searchDir: string;
@@ -134,7 +142,7 @@ export async function handleCommentCommand(
 	let document: ResponseDocument;
 	if (filePath !== undefined) {
 		try {
-			const text = await readFile(resolve(ctx.cwd, filePath), "utf8");
+			const text = await readFile(resolve(ctx.cwd, expandHome(filePath)), "utf8");
 			document = createResponseDocument(text, filePath);
 		} catch (error) {
 			ctx.ui.notify(`Cannot read ${filePath}: ${errorText(error)}`, "error");
