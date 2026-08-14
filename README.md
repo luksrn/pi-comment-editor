@@ -2,7 +2,7 @@
 
 Native, line-based review for [Pi](https://github.com/earendil-works/pi-mono) assistant responses.
 
-`@ramtinj95/pi-comment-editor` opens the latest completed assistant response in a Pi-native review interface. Navigate the original Markdown by logical source line, attach typed feedback to exact lines or ranges, and prepare a structured follow-up in Pi's input editor.
+`@ramtinj95/pi-comment-editor` opens the latest completed assistant response — or any file you pass to `/comment` — in a Pi-native review interface. Navigate the original Markdown by logical source line, attach typed feedback to exact lines or ranges, and prepare a structured follow-up in Pi's input editor.
 
 Nothing is submitted automatically.
 
@@ -36,6 +36,16 @@ Then:
 4. Press `Ctrl-s` to save each annotation draft.
 5. Press `y` to finish.
 6. Review or edit the prepared message in Pi's input editor before sending it yourself.
+
+### Reviewing a file
+
+Pass a file path to review its contents instead of the latest response:
+
+```text
+/comment path/to/file.md
+```
+
+The path is resolved against the session's working directory and accepts absolute paths, `~`, and quoted paths with spaces (`/comment "my notes.md"`). Tab-completes files and directories in the argument position. The reviewer behaves exactly the same as for responses, except the prepared message references the file (`File line 2`) and the source path instead of the assistant response.
 
 ## Native review interface
 
@@ -145,10 +155,11 @@ The extension calls Pi's editor-loading API only. It never invokes message submi
 
 `/comment` deliberately fails closed:
 
-- It accepts no arguments and runs only in Pi's interactive TUI.
-- It reads the latest assistant entry from the current session branch.
+- With no arguments it reads the latest assistant entry from the current session branch; with a file path argument it reads that file (resolved against the session working directory) and never consults the branch.
+- It runs only in Pi's interactive TUI.
 - The latest assistant response must be completed successfully; it will not skip an aborted response and review an older one.
 - Non-text assistant content is ignored.
+- Unreadable file paths report an error without opening the reviewer.
 - Cancelling, finishing without annotations, or encountering an error leaves the existing Pi input unchanged.
 - Leaving with saved annotations requires explicit discard confirmation.
 - The reviewer never runs an external editor or evaluates shell configuration.

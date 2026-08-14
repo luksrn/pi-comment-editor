@@ -18,6 +18,8 @@ export interface ResponseDocument {
 	sourceText: string;
 	lines: readonly string[];
 	displayLines: readonly string[];
+	/** Display label for the reviewed source, e.g. a file path. Absent for assistant responses. */
+	title?: string;
 }
 
 export interface AnnotationDraft {
@@ -106,13 +108,17 @@ export function sanitizeDisplayText(text: string): string {
 	return result;
 }
 
-export function createResponseDocument(sourceText: string): ResponseDocument {
+export function createResponseDocument(
+	sourceText: string,
+	title?: string,
+): ResponseDocument {
 	const lines = sourceText.split(/\r\n|\r|\n/);
 	if (lines.length === 0) lines.push("");
 	return {
 		sourceText,
 		lines,
 		displayLines: lines.map(sanitizeDisplayText),
+		...(title !== undefined ? { title } : {}),
 	};
 }
 
@@ -456,6 +462,17 @@ export function pageTarget(
 	};
 }
 
+function annotationLocation(
+	document: ResponseDocument,
+	target: AnnotationTarget,
+): string {
+	if (target.kind === "overall") return `Overall ${document.title ?? "response"}`;
+	const start = target.startLine + 1;
+	const end = target.endLine + 1;
+	const unit = document.title ? "File" : "Response";
+	return start === end ? `${unit} line ${start}` : `${unit} lines ${start}-${end}`;
+}
+
 export function formatReviewMessage(
 	document: ResponseDocument,
 	annotations: readonly ResponseAnnotation[],
@@ -464,7 +481,9 @@ export function formatReviewMessage(
 	if (ordered.length === 0) return "";
 
 	const output: string[] = [
-		"I reviewed your previous response. Please address these annotations.",
+		document.title
+			? `I reviewed \`${document.title}\`. Please address these annotations.`
+			: "I reviewed your previous response. Please address these annotations.",
 		"",
 	];
 
@@ -472,12 +491,7 @@ export function formatReviewMessage(
 		const annotation = ordered[index];
 		const marker = `${index + 1}. `;
 		const continuationIndent = " ".repeat(marker.length);
-		let location = "Overall response";
-		if (annotation.target.kind === "lines") {
-			const start = annotation.target.startLine + 1;
-			const end = annotation.target.endLine + 1;
-			location = start === end ? `Response line ${start}` : `Response lines ${start}-${end}`;
-		}
+		const location = annotationLocation(document, annotation.target);
 
 		output.push(`${marker}**[${annotation.kind.toUpperCase()}]** ${location}`, "");
 

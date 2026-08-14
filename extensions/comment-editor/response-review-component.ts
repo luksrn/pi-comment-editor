@@ -335,7 +335,7 @@ export class ResponseReviewComponent implements Component, Focusable {
 			fitLine(
 				` ${this.theme.bold(this.theme.fg("accent", "Response review"))} ${this.theme.fg(
 					"dim",
-					`· line ${this.state.cursorLine + 1}/${this.state.document.lines.length} · ${this.state.annotations.length} annotation${this.state.annotations.length === 1 ? "" : "s"}`,
+					`${this.state.document.title ? ` · ${this.state.document.title}` : ""} · line ${this.state.cursorLine + 1}/${this.state.document.lines.length} · ${this.state.annotations.length} annotation${this.state.annotations.length === 1 ? "" : "s"}`,
 				)}`,
 				renderWidth,
 			),
@@ -346,7 +346,7 @@ export class ResponseReviewComponent implements Component, Focusable {
 		} else if (this.state.mode.kind === "select") {
 			const target = getCurrentTarget(this.state);
 			const label = target.kind === "lines" ? `${target.startLine + 1}-${target.endLine + 1}` : "";
-			lines.push(fitLine(this.theme.fg("accent", ` Selecting response lines ${label}`), renderWidth));
+			lines.push(fitLine(this.theme.fg("accent", ` Selecting ${this.state.document.title ? "file" : "response"} lines ${label}`), renderWidth));
 		} else if (this.state.mode.kind === "draft") {
 			const draft = this.state.mode.draft;
 			const target =
