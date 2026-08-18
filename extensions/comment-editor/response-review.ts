@@ -1,3 +1,4 @@
+import { basename } from "node:path";
 import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 
 export type AnnotationKind = "comment" | "suggestion" | "issue";
@@ -20,6 +21,8 @@ export interface ResponseDocument {
 	displayLines: readonly string[];
 	/** Display label for the reviewed source, e.g. a file path. Absent for assistant responses. */
 	title?: string;
+	/** True when the source is Markdown and should be styled with Markdown syntax highlighting. */
+	markdown: boolean;
 }
 
 export interface AnnotationDraft {
@@ -108,16 +111,35 @@ export function sanitizeDisplayText(text: string): string {
 	return result;
 }
 
+const MARKDOWN_EXTENSIONS = new Set([".md", ".markdown", ".mdown", ".mkd", ".mdx"]);
+const MARKDOWN_BASENAMES = new Set(["readme", "changelog", "contributing", "code_of_conduct", "authors"]);
+
+/**
+ * True when a file path looks like Markdown: a known `.md`-family extension
+ * (case-insensitive) or a well-known extension-less Markdown filename.
+ */
+export function isMarkdownPath(filePath: string): boolean {
+	const normalized = filePath.toLowerCase();
+	const base = basename(normalized);
+	if (MARKDOWN_BASENAMES.has(base)) return true;
+	const dot = base.lastIndexOf(".");
+	if (dot <= 0) return false;
+	return MARKDOWN_EXTENSIONS.has(base.slice(dot));
+}
+
 export function createResponseDocument(
 	sourceText: string,
 	title?: string,
+	options?: { markdown?: boolean },
 ): ResponseDocument {
 	const lines = sourceText.split(/\r\n|\r|\n/);
 	if (lines.length === 0) lines.push("");
+	const markdown = options?.markdown ?? (title !== undefined ? isMarkdownPath(title) : false);
 	return {
 		sourceText,
 		lines,
 		displayLines: lines.map(sanitizeDisplayText),
+		markdown,
 		...(title !== undefined ? { title } : {}),
 	};
 }
@@ -405,6 +427,195 @@ export function highlightFencedCodeLines(
 		}
 		output[line] = decorateFence(output[line]);
 		if (closingLine < output.length) output[closingLine] = decorateFence(output[closingLine]);
+		line = closingLine + 1;
+	}
+	return output;
+}
+
+/**
+ * Styling callbacks for Markdown syntax highlighting. Each function wraps text in
+ * the ANSI styling for that Markdown element; no function may change visible text.
+ */
+export interface MarkdownDecorator {
+	heading: (text: string) => string;
+	link: (text: string) => string;
+	linkUrl: (text: string) => string;
+	code: (text: string) => string;
+	codeBlockBorder: (text: string) => string;
+	quote: (text: string) => string;
+	quoteBorder: (text: string) => string;
+	hr: (text: string) => string;
+	listBullet: (text: string) => string;
+	bold: (text: string) => string;
+	italic: (text: string) => string;
+	strikethrough: (text: string) => string;
+	underline?: (text: string) => string;
+}
+
+const ESCAPE_PATTERN = /^\\([\\`*_[\]{}()#+.!|<>~-])/;
+const CODE_SPAN_PATTERN = /^(`+)([\s\S]*?)\1(?!`)/;
+const LINK_PATTERN = /^!?\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/;
+const BOLD_ITALIC_PATTERN = /^(\*\*\*|___)([\s\S]*?)\1/;
+const BOLD_PATTERN = /^(\*\*|__)([\s\S]*?)\1/;
+const STRIKE_PATTERN = /^~~([\s\S]*?)~~/;
+const ITALIC_PATTERN = /^(\*|_)([\s\S]*?)\1/;
+const HEADING_PATTERN = /^ {0,3}(#{1,6})(?:([ \t]+)([\s\S]*)|$)/;
+const HR_PATTERN = /^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/;
+const QUOTE_PATTERN = /^ {0,3}(>+)([ \t]?)([\s\S]*)$/;
+const LIST_PATTERN = /^ {0,3}([-+*]|\d{1,9}[.)])([ \t]+)([\s\S]*)$/;
+
+/**
+ * Style the inline Markdown constructs in a single line: code spans, links, bold,
+ * italic, strikethrough, and backslash escapes. Markers stay visible so the line
+ * still reads as the original source; only the styling is added.
+ */
+function styleInlineMarkdown(text: string, decorate: MarkdownDecorator): string {
+	let output = "";
+	let index = 0;
+	while (index < text.length) {
+		const rest = text.slice(index);
+
+		const escape = ESCAPE_PATTERN.exec(rest);
+		if (escape) {
+			output += escape[0];
+			index += escape[0].length;
+			continue;
+		}
+
+		const codeSpan = CODE_SPAN_PATTERN.exec(rest);
+		if (codeSpan) {
+			output += decorate.code(codeSpan[0]);
+			index += codeSpan[0].length;
+			continue;
+		}
+
+		const link = LINK_PATTERN.exec(rest);
+		if (link) {
+			const alt = styleInlineMarkdown(link[1], decorate);
+			output += decorate.link(`[${alt}]`) + decorate.linkUrl(`(${link[2]})`);
+			index += link[0].length;
+			continue;
+		}
+
+		const boldItalic = BOLD_ITALIC_PATTERN.exec(rest);
+		if (boldItalic) {
+			const inner = styleInlineMarkdown(boldItalic[2], decorate);
+			output += decorate.bold(decorate.italic(boldItalic[1] + inner + boldItalic[1]));
+			index += boldItalic[0].length;
+			continue;
+		}
+
+		const bold = BOLD_PATTERN.exec(rest);
+		if (bold && !(bold[1] === "__" && index > 0 && /\w/.test(text[index - 1]))) {
+			const inner = styleInlineMarkdown(bold[2], decorate);
+			output += decorate.bold(bold[1] + inner + bold[1]);
+			index += bold[0].length;
+			continue;
+		}
+
+		const strike = STRIKE_PATTERN.exec(rest);
+		if (strike) {
+			const inner = styleInlineMarkdown(strike[1], decorate);
+			output += decorate.strikethrough(`~~${inner}~~`);
+			index += strike[0].length;
+			continue;
+		}
+
+		const italic = ITALIC_PATTERN.exec(rest);
+		if (italic) {
+			const marker = italic[1];
+			const beforeIsWord = index > 0 && /\w/.test(text[index - 1]);
+			const afterIsWord =
+				index + italic[0].length < text.length && /\w/.test(text[index + italic[0].length]);
+			if (!(beforeIsWord || afterIsWord) && italic[2].trim().length > 0) {
+				const inner = styleInlineMarkdown(italic[2], decorate);
+				output += decorate.italic(marker + inner + marker);
+				index += italic[0].length;
+				continue;
+			}
+		}
+
+		output += text[index];
+		index++;
+	}
+	return output;
+}
+
+function decorateMarkdownLine(text: string, decorate: MarkdownDecorator): string {
+	if (HR_PATTERN.test(text)) return decorate.hr(text);
+
+	const heading = HEADING_PATTERN.exec(text);
+	if (heading) {
+		const marker = heading[1];
+		const separator = heading[2] ?? "";
+		const rest = heading[3] ?? "";
+		const content = styleInlineMarkdown(rest, decorate);
+		const styled =
+			marker.length === 1 && decorate.underline
+				? decorate.bold(decorate.underline(separator + content))
+				: decorate.bold(separator + content);
+		return decorate.heading(marker + styled);
+	}
+
+	const quote = QUOTE_PATTERN.exec(text);
+	if (quote) {
+		const markers = quote[1];
+		const separator = quote[2];
+		const rest = quote[3];
+		return (
+			decorate.quoteBorder(markers) +
+			decorate.quote(separator + decorate.italic(styleInlineMarkdown(rest, decorate)))
+		);
+	}
+
+	const list = LIST_PATTERN.exec(text);
+	if (list) {
+		const marker = list[1];
+		const separator = list[2];
+		const rest = list[3];
+		return decorate.listBullet(marker + separator) + styleInlineMarkdown(rest, decorate);
+	}
+
+	return styleInlineMarkdown(text, decorate);
+}
+
+/**
+ * Decorate Markdown display lines with syntax highlighting while preserving the
+ * 1:1 source-line identity that annotations rely on. Fenced code blocks are
+ * highlighted via `highlight` and their delimiter lines styled with
+ * `codeBlockBorder`; every other line gets inline Markdown styling.
+ */
+export function decorateMarkdownLines(
+	displayLines: readonly string[],
+	decorate: MarkdownDecorator,
+	highlight: CodeHighlighter,
+): string[] {
+	const output = [...displayLines];
+	let line = 0;
+	while (line < displayLines.length) {
+		const fence = openingFence(displayLines[line]);
+		if (!fence) {
+			output[line] = decorateMarkdownLine(displayLines[line], decorate);
+			line++;
+			continue;
+		}
+
+		let closingLine = line + 1;
+		while (
+			closingLine < displayLines.length &&
+			!isClosingFence(displayLines[closingLine], fence)
+		) {
+			closingLine++;
+		}
+		const codeLines = displayLines.slice(line + 1, closingLine);
+		const highlighted = highlight(codeLines.join("\n"), fence.language);
+		if (highlighted.length === codeLines.length) {
+			for (let index = 0; index < highlighted.length; index++) {
+				output[line + 1 + index] = highlighted[index];
+			}
+		}
+		output[line] = decorate.codeBlockBorder(output[line]);
+		if (closingLine < output.length) output[closingLine] = decorate.codeBlockBorder(output[closingLine]);
 		line = closingLine + 1;
 	}
 	return output;

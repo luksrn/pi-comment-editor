@@ -199,4 +199,60 @@ describe("ResponseReviewComponent", () => {
 		component.handleInput("y");
 		expect(results).toEqual([{ kind: "empty" }]);
 	});
+
+	function markdownHarness(source: string, rows = 20) {
+		const tui = {
+			terminal: { rows, columns: 80 },
+			requestRender() {},
+		} as unknown as TUI;
+		const theme = {
+			fg: (color: string, text: string) =>
+				color.startsWith("md") ? `{${color}}${text}{/${color}}` : text,
+			bg: (_color: string, text: string) => text,
+			bold: (text: string) => `{b}${text}{/b}`,
+			italic: (text: string) => `{i}${text}{/i}`,
+			underline: (text: string) => `{u}${text}{/u}`,
+			strikethrough: (text: string) => `{s}${text}{/s}`,
+		} as unknown as Theme;
+		const component = new ResponseReviewComponent(
+			tui,
+			theme,
+			createResponseDocument(source, undefined, { markdown: true }),
+			() => {},
+		);
+		component.focused = true;
+		return { component };
+	}
+
+	test("renders markdown documents with syntax highlighting", () => {
+		const { component } = markdownHarness("# Heading\n\nSome **bold** text");
+		const output = component.render(60).join("\n");
+		expect(output).toContain("{mdHeading}");
+		expect(output).toContain("{b}");
+		expect(output).toContain("Markdown syntax highlighted");
+	});
+
+	test("keeps plain documents unstyled", () => {
+		const { component } = harness("# Heading\n\nSome **bold** text");
+		const output = component.render(60).join("\n");
+		expect(output).toContain("# Heading");
+		expect(output).not.toContain("{mdHeading}");
+		expect(output).toContain("Raw source");
+	});
+
+	test("caches markdown highlighting across state-only refreshes", () => {
+		const { component } = markdownHarness("# Title\n```ts\nconst value = 1;\n```");
+		component.render(60);
+		const internals = component as unknown as {
+			highlightedDisplayLines?: readonly string[];
+		};
+		const highlighted = internals.highlightedDisplayLines;
+
+		component.handleInput("j");
+		component.render(60);
+		expect(internals.highlightedDisplayLines).toBe(highlighted);
+
+		component.invalidate();
+		expect(internals.highlightedDisplayLines).toBeUndefined();
+	});
 });

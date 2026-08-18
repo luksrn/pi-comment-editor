@@ -47,12 +47,15 @@ Pass a file path to review its contents instead of the latest response:
 
 The path is resolved against the session's working directory and accepts absolute paths, `~`, and quoted paths with spaces (`/comment "my notes.md"`). Tab-completes files and directories in the argument position. The reviewer behaves exactly the same as for responses, except the prepared message references the file (`File line 2`) and the source path instead of the assistant response.
 
+Markdown files (`.md`, `.markdown`, `.mdown`, `.mkd`, `.mdx`, or extension-less names like `README` and `CHANGELOG`) are opened with Markdown syntax highlighting; all other files keep the plain source view.
+
 ## Native review interface
 
 The reviewer uses Pi's theme and keeps the assistant response tied to its original source:
 
-- Raw Markdown remains visible with stable, 1-based logical line numbers.
+- Markdown documents keep stable, 1-based logical line numbers and are rendered with Markdown syntax highlighting (headings, bold, italic, code spans, links, quotes, lists, and horizontal rules). The latest assistant response is always treated as Markdown, and file paths such as `.md`, `.markdown`, `.mdown`, `.mkd`, `.mdx`, `README`, and `CHANGELOG` are detected automatically.
 - Fenced code uses Pi's syntax highlighting, including language-tagged TypeScript and JSON.
+- Other files keep the plain source view; fenced code still uses Pi's syntax highlighting.
 - Long lines wrap to the terminal width without becoming new source lines.
 - Page navigation moves through wrapped display rows while preserving the logical cursor line.
 - Selected ranges use Pi's selection color.

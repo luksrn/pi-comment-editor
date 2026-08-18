@@ -180,7 +180,7 @@ export async function handleCommentCommand(
 			ctx.ui.notify("No completed assistant response found on the current branch", "error");
 			return;
 		}
-		document = createResponseDocument(lastAssistantText);
+		document = createResponseDocument(lastAssistantText, undefined, { markdown: true });
 	}
 
 	try {
