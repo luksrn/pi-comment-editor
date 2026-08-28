@@ -87,6 +87,42 @@ describe("formatReviewMessage", () => {
 		expect(formatReviewMessage(createResponseDocument("one"), [])).toBe("");
 	});
 
+	test("labels file documents with the path and File line references", () => {
+		const document = createResponseDocument("# Notes\n\nbody\n", "notes.md");
+		const annotations: ResponseAnnotation[] = [
+			{
+				id: "overall",
+				ordinal: 1,
+				target: { kind: "overall" },
+				kind: "comment",
+				body: "Shorten this.",
+			},
+			{
+				id: "line",
+				ordinal: 2,
+				target: { kind: "lines", startLine: 1, endLine: 1 },
+				kind: "issue",
+				body: "Fix this.",
+			},
+		];
+
+		expect(formatReviewMessage(document, annotations)).toBe(
+			[
+				"I reviewed `notes.md`. Please address these annotations.",
+				"",
+				"1. **[COMMENT]** Overall notes.md",
+				"",
+				"   Shorten this.",
+				"",
+				"2. **[ISSUE]** File line 2",
+				"",
+				"   > ",
+				"",
+				"   Fix this.",
+			].join("\n"),
+		);
+	});
+
 	test("aligns continuation content with multi-digit list markers", () => {
 		const document = createResponseDocument("quoted");
 		const annotations: ResponseAnnotation[] = Array.from({ length: 10 }, (_, index) => ({

@@ -16,6 +16,7 @@ import {
 	annotationsAtLine,
 	buildWrappedSourceRows,
 	createReviewState,
+	decorateMarkdownLines,
 	ensureCursorVisible,
 	getActiveAnnotation,
 	getCurrentTarget,
@@ -23,6 +24,7 @@ import {
 	pageTarget,
 	reduceReviewState,
 	type AnnotationKind,
+	type MarkdownDecorator,
 	type ResponseAnnotation,
 	type ResponseDocument,
 	type ReviewAction,
@@ -122,17 +124,42 @@ export class ResponseReviewComponent implements Component, Focusable {
 
 	private getHighlightedDisplayLines(): readonly string[] {
 		if (!this.highlightedDisplayLines) {
-			this.highlightedDisplayLines = highlightFencedCodeLines(
-				this.state.document,
-				(code, language) => {
-					try {
-						return highlightCode(code, language);
-					} catch {
-						return code.split("\n").map((line) => this.theme.fg("mdCodeBlock", line));
-					}
-				},
-				(line) => this.theme.fg("mdCodeBlockBorder", line),
-			);
+			const highlight = (code: string, language?: string) => {
+				try {
+					return highlightCode(code, language);
+				} catch {
+					return code.split("\n").map((line) => this.theme.fg("mdCodeBlock", line));
+				}
+			};
+			const decorateFence = (line: string) => this.theme.fg("mdCodeBlockBorder", line);
+			if (this.state.document.markdown) {
+				const decorate: MarkdownDecorator = {
+					heading: (text) => this.theme.fg("mdHeading", text),
+					link: (text) => this.theme.fg("mdLink", text),
+					linkUrl: (text) => this.theme.fg("mdLinkUrl", text),
+					code: (text) => this.theme.fg("mdCode", text),
+					codeBlockBorder: decorateFence,
+					quote: (text) => this.theme.fg("mdQuote", text),
+					quoteBorder: (text) => this.theme.fg("mdQuoteBorder", text),
+					hr: (text) => this.theme.fg("mdHr", text),
+					listBullet: (text) => this.theme.fg("mdListBullet", text),
+					bold: (text) => this.theme.bold(text),
+					italic: (text) => this.theme.italic(text),
+					strikethrough: (text) => this.theme.strikethrough(text),
+					underline: (text) => this.theme.underline(text),
+				};
+				this.highlightedDisplayLines = decorateMarkdownLines(
+					this.state.document.displayLines,
+					decorate,
+					highlight,
+				);
+			} else {
+				this.highlightedDisplayLines = highlightFencedCodeLines(
+					this.state.document,
+					highlight,
+					decorateFence,
+				);
+			}
 		}
 		return this.highlightedDisplayLines;
 	}
@@ -335,7 +362,7 @@ export class ResponseReviewComponent implements Component, Focusable {
 			fitLine(
 				` ${this.theme.bold(this.theme.fg("accent", "Response review"))} ${this.theme.fg(
 					"dim",
-					`· line ${this.state.cursorLine + 1}/${this.state.document.lines.length} · ${this.state.annotations.length} annotation${this.state.annotations.length === 1 ? "" : "s"}`,
+					`${this.state.document.title ? ` · ${this.state.document.title}` : ""} · line ${this.state.cursorLine + 1}/${this.state.document.lines.length} · ${this.state.annotations.length} annotation${this.state.annotations.length === 1 ? "" : "s"}`,
 				)}`,
 				renderWidth,
 			),
@@ -346,7 +373,7 @@ export class ResponseReviewComponent implements Component, Focusable {
 		} else if (this.state.mode.kind === "select") {
 			const target = getCurrentTarget(this.state);
 			const label = target.kind === "lines" ? `${target.startLine + 1}-${target.endLine + 1}` : "";
-			lines.push(fitLine(this.theme.fg("accent", ` Selecting response lines ${label}`), renderWidth));
+			lines.push(fitLine(this.theme.fg("accent", ` Selecting ${this.state.document.title ? "file" : "response"} lines ${label}`), renderWidth));
 		} else if (this.state.mode.kind === "draft") {
 			const draft = this.state.mode.draft;
 			const target =
@@ -365,7 +392,17 @@ export class ResponseReviewComponent implements Component, Focusable {
 				),
 			);
 		} else {
-			lines.push(fitLine(this.theme.fg("dim", " Raw Markdown source · logical line ranges"), renderWidth));
+			lines.push(
+				fitLine(
+					this.theme.fg(
+						"dim",
+						this.state.document.markdown
+							? " Markdown syntax highlighted · logical line ranges"
+							: " Raw source · logical line ranges",
+					),
+					renderWidth,
+				),
+			);
 		}
 
 		const digits = String(this.state.document.lines.length).length;
